@@ -1,11 +1,18 @@
 <!DOCTYPE html>
 <html>
+
 <head>
-<title>EmberCore Prototype v1</title>
+
+<title>EmberCore Dashboard</title>
 
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <style>
 
@@ -16,27 +23,26 @@ font-family:Arial;
 text-align:center;
 }
 
-.title{
-font-size:40px;
-font-weight:bold;
-}
-
-.subtitle{
-color:green;
-margin-bottom:20px;
-}
-
 .box{
 background:#111;
-padding:20px;
+padding:15px;
 margin:10px;
 border-radius:10px;
 display:inline-block;
 width:200px;
 }
 
-.value{
-font-size:30px;
+button{
+background:orange;
+border:none;
+padding:10px;
+margin:5px;
+cursor:pointer;
+}
+
+#map{
+height:400px;
+margin-top:20px;
 }
 
 </style>
@@ -45,52 +51,104 @@ font-size:30px;
 
 <body>
 
-<div class="title">EMBERCORE</div>
-<div class="subtitle">Forest Early Fire Detection System</div>
+<h1>EMBERCORE</h1>
 
-<div>Device: EC-A3F9</div>
+<h3>Forest Fire Detection Dashboard</h3>
 
-<div>
+
+<div id="nodes"></div>
+
 
 <div class="box">
+
 Temperature
-<div id="temp" class="value">--</div>
+
+<div id="temp">--</div>
+
 </div>
 
+
 <div class="box">
+
 Humidity
-<div id="hum" class="value">--</div>
+
+<div id="hum">--</div>
+
 </div>
+
 
 <div class="box">
-Smoke / Gas
-<div id="gas" class="value">--</div>
-</div>
+
+Gas
+
+<div id="gas">--</div>
 
 </div>
+
 
 <canvas id="chart"></canvas>
 
+
+<h2>Node Locations</h2>
+
+<div id="map"></div>
+
+
+
 <script>
+
+
+// 🔥 HARD CODED LOCATIONS
+
+const nodeLocations = {
+
+"EC-A3F9": {lat:18.5204, lng:73.8567},
+
+"EC-B7K2": {lat:18.5215, lng:73.8575},
+
+"EC-C1D2": {lat:18.5195, lng:73.8555}
+
+};
+
+
+
+// Firebase config
 
 const firebaseConfig = {
 
 apiKey: "PASTE",
+
 authDomain: "PASTE",
+
 databaseURL: "https://embercore-v01-default-rtdb.asia-southeast1.firebasedatabase.app",
+
 projectId: "PASTE",
-storageBucket: "PASTE",
-messagingSenderId: "PASTE",
-appId: "PASTE"
 
 };
 
+
 firebase.initializeApp(firebaseConfig);
 
-const db = firebase.database().ref("EmberCore/EC-A3F9");
 
-let tempData=[];
+const db = firebase.database().ref("EmberCore");
+
+
+
+// MAP
+
+const map = L.map('map').setView([18.5204,73.8567], 15);
+
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+
+
+// GRAPH
+
+let chartData=[];
+
 let labels=[];
+
 
 const chart=new Chart(document.getElementById("chart"),{
 
@@ -104,11 +162,9 @@ datasets:[{
 
 label:"Temperature",
 
-data:tempData,
+data:chartData,
 
-borderColor:"orange",
-
-borderWidth:2
+borderColor:"orange"
 
 }]
 
@@ -116,11 +172,82 @@ borderWidth:2
 
 });
 
-db.on("value",function(snapshot){
 
-const data=snapshot.val();
 
-if(data){
+
+// LOAD NODES
+
+db.on("value",(snapshot)=>{
+
+const nodes=snapshot.val();
+
+document.getElementById("nodes").innerHTML="";
+
+
+// Clear markers
+
+map.eachLayer((layer)=>{
+
+if(layer instanceof L.Marker)
+
+map.removeLayer(layer);
+
+});
+
+
+for(let id in nodes){
+
+
+// Create button
+
+const btn=document.createElement("button");
+
+btn.innerHTML=id;
+
+btn.onclick=()=>selectNode(id);
+
+document.getElementById("nodes").appendChild(btn);
+
+
+// Add marker using hard coded location
+
+if(nodeLocations[id]){
+
+L.marker([
+
+nodeLocations[id].lat,
+
+nodeLocations[id].lng
+
+])
+
+.addTo(map)
+
+.bindPopup(id);
+
+}
+
+}
+
+
+});
+
+
+
+
+// SELECT NODE
+
+function selectNode(id){
+
+firebase.database()
+
+.ref("EmberCore/"+id)
+
+.on("value",(snap)=>{
+
+
+const data=snap.val();
+
 
 document.getElementById("temp").innerHTML=data.temp+" °C";
 
@@ -128,17 +255,22 @@ document.getElementById("hum").innerHTML=data.humidity+" %";
 
 document.getElementById("gas").innerHTML=data.gas;
 
-tempData.push(data.temp);
+
+chartData.push(data.temp);
 
 labels.push("");
 
 chart.update();
 
-}
 
 });
 
+}
+
+
 </script>
 
+
 </body>
+
 </html>
